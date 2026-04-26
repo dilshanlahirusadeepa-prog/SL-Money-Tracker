@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Money Tracker PRO MAX</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+*{box-sizing:border-box;font-family:sans-serif;}
+
+body{
+margin:0;
+background:linear-gradient(135deg,#020617,#0f172a);
+color:white;
+padding-bottom:70px;
+}
+
+/* HEADER */
+.header{
+display:flex;
+align-items:center;
+gap:10px;
+padding:20px;
+}
+
+.header img{
+width:45px;
+height:45px;
+border-radius:50%;
+object-fit:cover;
+border:2px solid #22c55e;
+cursor:pointer;
+}
+
+.balance{
+font-size:28px;
+font-weight:bold;
+}
+
+/* CARD */
+.card{
+background:rgba(255,255,255,0.05);
+backdrop-filter:blur(12px);
+border-radius:16px;
+padding:15px;
+margin:10px;
+}
+
+/* GRID */
+.grid{
+display:grid;
+grid-template-columns:1fr 1fr;
+gap:10px;
+}
+
+/* INPUT */
+input,select{
+width:100%;
+padding:12px;
+border-radius:10px;
+border:none;
+margin-top:8px;
+background:#020617;
+color:white;
+}
+
+button{
+width:100%;
+padding:12px;
+border-radius:10px;
+border:none;
+margin-top:10px;
+background:#22c55e;
+color:black;
+font-weight:bold;
+}
+
+/* ITEM (SWIPE STYLE) */
+.item{
+display:flex;
+justify-content:space-between;
+align-items:center;
+margin-top:8px;
+padding:10px;
+background:#020617;
+border-radius:8px;
+position:relative;
+overflow:hidden;
+transition:0.3s;
+}
+
+/* swipe delete effect */
+.item.swipe{
+transform:translateX(-80px);
+opacity:0.4;
+}
+
+/* NAV */
+.nav{
+position:fixed;
+bottom:0;
+width:100%;
+display:flex;
+background:#020617;
+}
+
+.nav button{
+flex:1;
+padding:15px;
+background:none;
+color:white;
+border:none;
+font-size:18px;
+}
+
+/* PAGES */
+.page{display:none;}
+.active{display:block;}
+
+/* PROFILE IMAGE */
+#profilePic{
+width:100px;
+height:100px;
+border-radius:50%;
+display:block;
+margin:auto;
+object-fit:cover;
+cursor:pointer;
+border:3px solid #22c55e;
+}
+
+/* TOAST */
+#toast{
+position:fixed;
+top:20px;
+left:50%;
+transform:translateX(-50%);
+background:#22c55e;
+color:black;
+padding:10px 15px;
+border-radius:10px;
+opacity:0;
+transition:0.3s;
+z-index:999;
+}
+</style>
+</head>
+
+<body>
+
+<div id="toast"></div>
+
+<!-- HOME -->
+<div id="home" class="page active">
+
+<div class="header">
+<img id="topPic" onclick="showPage('profile')">
+<div>
+<h3>👋 <span id="username">User</span></h3>
+<div class="balance">Rs <span id="balance">0</span></div>
+</div>
+</div>
+
+<div class="grid">
+<div class="card">Income<br><b>Rs <span id="incomeTotal">0</span></b></div>
+<div class="card">Expense<br><b>Rs <span id="expenseTotal">0</span></b></div>
+</div>
+
+<div class="card">
+<canvas id="chart"></canvas>
+</div>
+
+</div>
+
+<!-- ADD -->
+<div id="add" class="page">
+
+<div class="card">
+<h3>Add Transaction</h3>
+
+<select id="type">
+<option value="income">Income</option>
+<option value="expense">Expense</option>
+</select>
+
+<input id="text" placeholder="Description">
+<input id="amount" type="number" placeholder="Amount">
+
+<select id="category">
+<option>Food</option>
+<option>Transport</option>
+<option>Bills</option>
+<option>Other</option>
+</select>
+
+<button onclick="addTransaction()">Add</button>
+</div>
+
+</div>
+
+<!-- HISTORY -->
+<div id="history" class="page">
+
+<div class="card">
+<h3>History (Swipe or Tap ❌)</h3>
+<div id="historyList"></div>
+</div>
+
+</div>
+
+<!-- PROFILE -->
+<div id="profile" class="page">
+
+<div class="card">
+<h3>Profile</h3>
+
+<img id="profilePic" onclick="triggerUpload()">
+<input type="file" id="imgInput" style="display:none;">
+
+<input id="nameInput" placeholder="Enter name">
+
+<button onclick="saveProfile()">Save Profile</button>
+
+</div>
+
+</div>
+
+<!-- NAV -->
+<div class="nav">
+<button onclick="showPage('home')">🏠</button>
+<button onclick="showPage('add')">➕</button>
+<button onclick="showPage('history')">📜</button>
+<button onclick="showPage('profile')">👤</button>
+</div>
+
+<script>
+
+/* FIX INPUTS */
+const typeEl=document.getElementById("type");
+const textEl=document.getElementById("text");
+const amountEl=document.getElementById("amount");
+const category=document.getElementById("category");
+
+let data = JSON.parse(localStorage.getItem("moneyMAX")) || {
+income:[],
+expense:[]
+};
+
+function save(){
+localStorage.setItem("moneyMAX",JSON.stringify(data));
+update();
+showToast("Saved ✔");
+}
+
+/* PAGE SWITCH */
+function showPage(p){
+document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));
+document.getElementById(p).classList.add("active");
+}
+
+/* TOAST */
+function showToast(msg){
+let t=document.getElementById("toast");
+t.innerText=msg;
+t.style.opacity=1;
+setTimeout(()=>{t.style.opacity=0},1500);
+}
+
+/* ADD */
+function addTransaction(){
+let type=typeEl.value;
+let text=textEl.value;
+let amt=Number(amountEl.value);
+let cat=category.value;
+
+if(!amt) return;
+
+if(type==="income"){
+data.income.push({text,amt});
+showToast("Income Added 💰");
+}else{
+data.expense.push({text,amt,cat});
+showToast("Expense Added 💸");
+}
+
+save();
+textEl.value="";
+amountEl.value="";
+}
+
+/* DELETE */
+function deleteIncome(i){
+data.income.splice(i,1);
+save();
+showToast("Deleted ❌");
+}
+
+function deleteExpense(i){
+data.expense.splice(i,1);
+save();
+showToast("Deleted ❌");
+}
+
+/* EDIT */
+function editIncome(i){
+let v=prompt("Edit amount",data.income[i].amt);
+if(v){data.income[i].amt=Number(v);save();}
+}
+
+function editExpense(i){
+let v=prompt("Edit amount",data.expense[i].amt);
+if(v){data.expense[i].amt=Number(v);save();}
+}
+
+/* PROFILE */
+function triggerUpload(){
+document.getElementById("imgInput").click();
+}
+
+function saveProfile(){
+
+let name=nameInput.value;
+if(name){
+localStorage.setItem("username",name);
+username.innerText=name;
+}
+
+let file=imgInput.files[0];
+if(file){
+let reader=new FileReader();
+reader.onload=function(e){
+localStorage.setItem("pic",e.target.result);
+topPic.src=e.target.result;
+profilePic.src=e.target.result;
+}
+reader.readAsDataURL(file);
+}
+
+showToast("Profile Updated 👤");
+}
+
+/* LOAD */
+let savedName=localStorage.getItem("username")||"User";
+username.innerText=savedName;
+
+let savedPic=localStorage.getItem("pic");
+if(savedPic){
+topPic.src=savedPic;
+profilePic.src=savedPic;
+}
+
+/* SWIPE DELETE */
+function addSwipe(el,type,index){
+
+let startX=0;
+
+el.addEventListener("touchstart",(e)=>{
+startX=e.touches[0].clientX;
+});
+
+el.addEventListener("touchend",(e)=>{
+let endX=e.changedTouches[0].clientX;
+
+if(startX-endX>80){
+el.classList.add("swipe");
+setTimeout(()=>{
+if(type==="income") deleteIncome(index);
+else deleteExpense(index);
+},300);
+}
+});
+}
+
+/* UPDATE */
+let chart;
+
+function update(){
+
+let ti=data.income.reduce((a,b)=>a+b.amt,0);
+let te=data.expense.reduce((a,b)=>a+b.amt,0);
+let bal=ti-te;
+
+incomeTotal.innerText=ti;
+expenseTotal.innerText=te;
+balance.innerText=bal;
+
+/* chart */
+if(chart) chart.destroy();
+
+chart=new Chart(document.getElementById("chart"),{
+type:"doughnut",
+data:{
+labels:["Income","Expense"],
+datasets:[{data:[ti,te]}]
+}
+});
+
+/* history */
+historyList.innerHTML="";
+
+data.income.forEach((i,idx)=>{
+let div=document.createElement("div");
+div.className="item";
+div.innerHTML=`<span>💰 ${i.text} - Rs ${i.amt}</span>
+<div>
+<button onclick="editIncome(${idx})">✏️</button>
+<button onclick="deleteIncome(${idx})">❌</button>
+</div>`;
+historyList.appendChild(div);
+addSwipe(div,"income",idx);
+});
+
+data.expense.forEach((i,idx)=>{
+let div=document.createElement("div");
+div.className="item";
+div.innerHTML=`<span>💸 ${i.text} (${i.cat}) - Rs ${i.amt}</span>
+<div>
+<button onclick="editExpense(${idx})">✏️</button>
+<button onclick="deleteExpense(${idx})">❌</button>
+</div>`;
+historyList.appendChild(div);
+addSwipe(div,"expense",idx);
+});
+
+}
+
+update();
+
+</script>
+
+</body>
+</html>
